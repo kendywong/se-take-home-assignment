@@ -1,12 +1,8 @@
-from sre_parse import State
 from tkinter import *
 
-import time
 import threading
 import numpy as np
 from queue import PriorityQueue
-
-from matplotlib.pyplot import text
 
 C_ORANGE = "#D6A171"
 C_GREEN = "#D8D6A3"
