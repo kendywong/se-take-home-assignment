@@ -1,8 +1,13 @@
+from sre_parse import State
 from tkinter import *
 
+import time
 import threading
+from threading import Timer
 import numpy as np
 from queue import PriorityQueue
+
+from matplotlib.pyplot import text
 
 C_ORANGE = "#D6A171"
 C_GREEN = "#D8D6A3"
@@ -14,6 +19,11 @@ TEXT_COLOUR = "#EAECEE"
 FONT = "Helvetica 14"
 BOLD_FONT = "Helvetica 14 bold"
 
+class RepeatTimer(Timer):
+    def run(self):
+        while not self.finished.wait(self.interval):
+            self.function(*self.args, **self.kwargs)
+
 class Application:
 
     def __init__(self):
@@ -23,6 +33,7 @@ class Application:
         self.order_number = 100
         self.orders = []
         self.processing = []
+        self.complete_list = []
         self.bot = 0
         self.counter = 0
         self.counter2 = 0
@@ -74,11 +85,11 @@ class Application:
         bottom_label.place(relwidth=1, rely=0.76)
 
         #normal order button
-        normal_btn = Button(bottom_label, text="Normal Order", font=FONT, width=20, bg=C_ORANGE, command=lambda:self._new_order(None))
+        normal_btn = Button(bottom_label, text="Normal Order", font=FONT, width=20, bg=C_ORANGE, command=lambda:self._new_order())
         normal_btn.place(relx=0.1, rely=0.022, relheight=0.04, relwidth=0.25)
 
         #vip order button
-        vip_btn = Button(bottom_label, text="VIP Order", font=FONT, width=20, bg=C_ORANGE, command=lambda:self._new_vip_order(None))
+        vip_btn = Button(bottom_label, text="VIP Order", font=FONT, width=20, bg=C_ORANGE, command=lambda:self._new_vip_order())
         vip_btn.place(relx=0.1, rely=0.082, relheight=0.04, relwidth=0.25)
 
         #no of bots text widget
@@ -94,55 +105,39 @@ class Application:
         minus_btn = Button(bottom_label, text="-", font=FONT, width=20, bg=C_ORANGE, command=lambda:self._minus_bot())
         minus_btn.place(relx=0.8, rely=0.09, relheight=0.03, relwidth=0.1)
 
-
-    #run after threading timer
     def waitForThis(self):
         done_msg = f"Order {self.processing[self.counter2][1]} Completed \n\n"
         self.counter2 = self.counter2 + 1
         self.complete.configure(state=NORMAL)
         self.complete.insert('1.0', done_msg)
         self.complete.configure(state=DISABLED)
+        # after threading timer, 'waitForThis' gets executed
+        self.pending.configure(state=NORMAL)
+        self.pending.delete('1.0', END)
+        self.pending.configure(state=DISABLED)
 
     #timer for ordering
-    def _new_order(self, msg):
+    def _new_order(self):
         self.orders.append((2, self.order_number))
-        msg = f"Food Order {self.orders[self.counter][1]} Processing \n\n"
         self.counter = self.counter + 1
-        self.pending.configure(state=NORMAL)
-        self.pending.insert('1.0', msg)
-        self.pending.configure(state=DISABLED)
-        self.processing = sorted(self.orders, key=lambda x: x[0])
+        self.processing = sorted(self.orders, key=lambda x: x[0], reverse=True)
         self.order_number = self.order_number + 1
         
 
-    #vip order function
-    def _new_vip_order(self,msg2):
+
+    def _new_vip_order(self):
         self.orders.append((1, self.order_number))
-        msg2 = f"Food Order {self.orders[self.counter][1]} Processing \n\n"
         self.counter = self.counter + 1
-        self.pending.configure(state=NORMAL)
-        self.pending.insert('1.0', msg2)
-        self.pending.configure(state=DISABLED)
         self.order_number = self.order_number + 1
-        self.processing = sorted(self.orders, key=lambda x: x[0])
+        self.processing = sorted(self.orders, key=lambda x: x[0], reverse=True)
         
-
-    #add bot function
     def _add_bot(self):
         self.bot = self.bot + 1
         bot_msg = f"Number of Bots: {self.bot}\n\n"
         self.settings.configure(state=NORMAL)
         self.settings.insert('1.0', bot_msg)
         self.settings.configure(state=DISABLED)
-        n = len(self.processing)
-        while n > 0:
-            if self.bot > 0:
-                timer = threading.Timer(3.0, self.waitForThis)
-                timer.start()
-                n = n - 1
             
-
-    #minus bot function
     def _minus_bot(self):
         self.bot = np.maximum(0, self.bot - 1)
         bot_msg = f"Number of Bots: {self.bot}\n\n"
@@ -152,7 +147,38 @@ class Application:
     
 
     def run_gui(self):
+        print('refresh')
+        self.window.after(1000, self.refresh)
         self.window.mainloop()
+
+    def refresh(self):
+        print('refresh')
+        
+        # after threading timer, 'waitForThis' gets executed
+
+        if self.bot > 0:
+            if len(self.processing) > 0:
+                order = self.processing.pop()
+                self.complete_list.append(order)
+
+        self.complete.configure(state=NORMAL)
+        self.complete.delete('1.0', END)
+
+        for order in self.complete_list:
+            msg = f"Food Order {order} Completed \n\n"
+            self.complete.insert('1.0', msg)
+
+        self.pending.configure(state=NORMAL)
+        self.pending.delete('1.0', END)
+            
+        for order in self.processing:
+             msg = f"Food Order {order} Processing \n\n"
+             self.pending.insert('1.0', msg)
+
+
+        self.complete.configure(state=DISABLED)
+        self.pending.configure(state=DISABLED)
+        self.window.after(1000, self.refresh)
 
 if __name__ == '__main__':
     gui = Application()
